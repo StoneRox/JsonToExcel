@@ -17,7 +17,7 @@ let commands = [
 
 let config = getArguments(commands);
 
-if (config.help || config.pathToJSON !== undefined) {
+if (config.help || config.pathToJSON === undefined) {
 	commands.forEach((cmd) => {
 		console.log();
 		console.log("\x1b[32m",`command: --${cmd.command} or -${cmd.alias}\n${cmd.description}`,"\x1b[37m");
@@ -32,12 +32,14 @@ if (config.selectProperty) {
 }
 jsonFile = [].concat(jsonFile);
 let headings = [];
-
+let sheetIndex;
 if (jsonFile instanceof Array) {
 	jsonFile.forEach((element, worksheetIndex) => {
 		// Add Worksheets to the workbook
 		let worksheet = workbook.addWorksheet('Sheet ' + worksheetIndex);
 		headings = [];
+		sheetIndex = worksheetIndex;
+		dryRunContent[sheetIndex] = [];
 		if (element.constructor === Object || element instanceof Array) {
 			Object.keys(element).forEach((key, i) => {
 				let currentColumn = 1;
@@ -81,23 +83,32 @@ if (jsonFile instanceof Array) {
 }
 let fileName = (config.outputFileName || new Date().toLocaleString().replace(/[^\w]/g,''))+'.xlsx';
 if (config["dry-run"]) {
-	for (let i = 1; i <= dryRunContent.length; i++) {
-		let rowContent = dryRunContent.filter((cell) => cell.row === i);		
-		if (!rowContent.length > 0) {
-			break;
-		} else {
-			let log = rowContent.sort((a,b) => {
-				if (a.col > b.col) {
-					return 1;
-				}
-				if (a.col < b.col) {
-					return -1;
-				}
-				return 0;
-			}).map((cell) => {
-				return '[' + cell.content + ']';
-			});
-			console.log(log.join(' '));
+	for (let i = 0; i < dryRunContent.length; i++) {
+		console.log('\nsheet' + i);
+		for (let j = 1; j <= dryRunContent[i].length; j++) {
+			let rowContent = dryRunContent[i].filter((cell) => cell.row === j);		
+			if (!rowContent.length > 0) {
+				break;
+			} else {
+				let prevCol;
+				let log = rowContent.sort((a,b) => {
+					if (a.col > b.col) {
+						return 1;
+					}
+					if (a.col < b.col) {
+						return -1;
+					}
+					return 0;
+				}).map((cell) => {
+					let result = '';
+					if (prevCol) {
+						result += '[]'.repeat(cell.col - prevCol - 1);
+					}
+					prevCol = cell.col;
+					return result + '[' + cell.content + ']';
+				});
+				console.log(log.join(' '));
+			}
 		}
 	}
 	process.exit(1);
@@ -107,17 +118,17 @@ workbook.write(fileName);
 console.log("\x1b[32m","Done!","\x1b[37m");
 console.log("\x1b[32m",`${fileName} has been created!`,"\x1b[37m");
 function setHeading (worksheet, row, col, heading) {
-	if (!headings.find((h) => h.row === row && h.col === col && h.content === heading)	) {
+	if (!headings.find((h) => h.row === row && h.col === col && h.content === heading)) {
 		worksheet.cell(row, col).string(heading);
 		let cell = {
 			content: heading,
 			row,
 			col
 		}
-		headings.push(cell);		
+		headings.push(cell);
 		worksheet.lastUsedCol = col;
 		if (config["dry-run"]) {
-			dryRunContent.push(cell);
+			dryRunContent[sheetIndex].push(cell);
 		}
 	}
 }
@@ -127,13 +138,13 @@ function setString (worksheet, row, col, string) {
 		string = JSON.stringify(string);
 	}
 	worksheet.cell(row, col).string(string);
-	worksheet.lastUsedCol = col;	
+	worksheet.lastUsedCol = col;
 	let cell = {
 			content: string,
 			row,
 			col
 		}
 	if (config["dry-run"]) {
-		dryRunContent.push(cell);
+		dryRunContent[sheetIndex].push(cell);
 	}
 }
