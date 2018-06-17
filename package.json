@@ -1,0 +1,22 @@
+{
+  "name": "jsontoexcel",
+  "version": "1.0.0",
+  "description": "Converts json to excel file",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StoneRox/JsonToExcel.git"
+  },
+  "author": "Petar Petrov",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/StoneRox/JsonToExcel/issues"
+  },
+  "homepage": "https://github.com/StoneRox/JsonToExcel#readme",
+  "dependencies": {
+    "excel4node": "^1.3.6"
+  }
+}
