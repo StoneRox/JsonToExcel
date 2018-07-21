@@ -33,6 +33,8 @@ if (config.selectProperty) {
 jsonFile = [].concat(jsonFile);
 let headings = [];
 let sheetIndex;
+let maxRowIndexUsed = 0;
+let columnHeadingRow = 0;
 if (jsonFile instanceof Array) {
 	jsonFile.forEach((element, worksheetIndex) => {
 		// Add Worksheets to the workbook
@@ -44,38 +46,38 @@ if (jsonFile instanceof Array) {
 			Object.keys(element).forEach((key, i) => {
 				let currentColumn = 1;
 				// First prop : groupHeading
-				setHeading(worksheet,worksheet.lastUsedRow + i, currentColumn,key);
+				setHeading(worksheet,maxRowIndexUsed + 1, currentColumn,key);
+				columnHeadingRow = worksheet.lastUsedRow;				
 				if (element[key].constructor === Object || element[key] instanceof Array) {
-					Object.keys(element[key]).forEach((key2,i2) => {						
+					Object.keys(element[key]).forEach((key2,i2) => {
 						let secondValue = element[key][key2];
 						let lastUsedRow = i2 < 1 ? worksheet.lastUsedRow : 1;
-						let nextCol = worksheet.lastUsedCol + 1;
 						// Second prop : columnHeading
-						setHeading(worksheet, lastUsedRow, nextCol,key2);
-						let nextRow = i2 > 0 ? 2 : worksheet.lastUsedRow + 1;
+						let nextCol = worksheet.lastUsedCol + 1;
+						setHeading(worksheet, columnHeadingRow, nextCol,key2);
+						let nextRow = i2 > 0 ? columnHeadingRow + 1 : worksheet.lastUsedRow + 1;
 						if (secondValue.constructor === Object || secondValue instanceof Array) {
 							Object.keys(element[key][key2]).forEach((key3,i3) => {
 								let thirdValue = element[key][key2][key3];
-								let lastUsedCol = 1;
 								// Third prop : rowHeading
-								setHeading(worksheet,nextRow++, 1,key3);	
+								setHeading(worksheet,nextRow++, 1,key3);
 								if (thirdValue.constructor === Object || thirdValue instanceof Array) {
 									Object.keys(thirdValue).forEach((key4,i4) => {
-										// Fourth prop: rowSubHeading -> cell values									
-										setHeading(worksheet,nextRow, 1,key4);											
-										setString(worksheet,nextRow, nextCol,thirdValue[key4]);
+										// Fourth prop: rowSubHeading -> cell values
+										setHeading(worksheet,nextRow, 1,key4);
+										setString(worksheet,nextRow, nextCol,thirdValue[key4]);   
 										nextRow++;
 									});
 								} else {
-									setString(worksheet,nextRow - 1, worksheet.lastUsedCol + 1 ,thirdValue);
+									setString(worksheet,nextRow - 1, worksheet.lastUsedCol, thirdValue);
 								}
 							});
 						} else {
-							setString(worksheet,nextRow, worksheet.lastUsedCol + 1,secondValue);							
+							setString(worksheet,maxRowIndexUsed+1, i2+2,secondValue);
 						}
 					});
 				} else {
-					setString(worksheet,worksheet.lastUsedRow, worksheet.lastUsedCol + 1,element[key]);
+					setString(worksheet,maxRowIndexUsed, worksheet.lastUsedCol + 1,element[key]);
 				}
 			});
 		}
@@ -86,7 +88,7 @@ if (config["dry-run"]) {
 	for (let i = 0; i < dryRunContent.length; i++) {
 		console.log('\nsheet' + i);
 		for (let j = 1; j <= dryRunContent[i].length; j++) {
-			let rowContent = dryRunContent[i].filter((cell) => cell.row === j);		
+			let rowContent = dryRunContent[i].filter((cell) => cell.row === j);
 			if (!rowContent.length > 0) {
 				break;
 			} else {
@@ -99,10 +101,14 @@ if (config["dry-run"]) {
 						return -1;
 					}
 					return 0;
-				}).map((cell) => {
-					let result = '';
-					if (prevCol) {
-						result += '[]'.repeat(cell.col - prevCol - 1);
+				}).map((cell, cellIndex) => {
+					let result = '';		
+					if(cellIndex === 0) {
+						prevCol = 0;
+					}
+					if (!isNaN(prevCol)) {
+						let emptyCellsCount = cell.col - prevCol - 1;
+						result += '[]'.repeat(emptyCellsCount < 0 ? 0 : emptyCellsCount);
 					}
 					prevCol = cell.col;
 					return result + '[' + cell.content + ']';
@@ -117,8 +123,8 @@ if (config["dry-run"]) {
 workbook.write(fileName);
 console.log("\x1b[32m","Done!","\x1b[37m");
 console.log("\x1b[32m",`${fileName} has been created!`,"\x1b[37m");
-function setHeading (worksheet, row, col, heading) {
-	if (!headings.find((h) => h.row === row && h.col === col && h.content === heading)) {
+function setHeading (worksheet, row, col, heading, force) {
+	if (!headings.find((h) => h.row === row && h.col === col && h.content === heading) || force) {
 		worksheet.cell(row, col).string(heading);
 		let cell = {
 			content: heading,
@@ -127,24 +133,29 @@ function setHeading (worksheet, row, col, heading) {
 		}
 		headings.push(cell);
 		worksheet.lastUsedCol = col;
-		if (config["dry-run"]) {
-			dryRunContent[sheetIndex].push(cell);
+		if(row > maxRowIndexUsed){
+			maxRowIndexUsed = row;
 		}
+		dryRunContent[sheetIndex].push(cell);
 	}
 }
 
 function setString (worksheet, row, col, string) {
+	if (dryRunContent[sheetIndex].find((h) => h.row === row && h.col === col)) {
+		col++;
+	}
 	if (typeof string !== 'string') {
 		string = JSON.stringify(string);
 	}
 	worksheet.cell(row, col).string(string);
 	worksheet.lastUsedCol = col;
+	if(row > maxRowIndexUsed){
+		maxRowIndexUsed = row;
+	}
 	let cell = {
 			content: string,
 			row,
 			col
 		}
-	if (config["dry-run"]) {
-		dryRunContent[sheetIndex].push(cell);
-	}
+	dryRunContent[sheetIndex].push(cell);
 }
